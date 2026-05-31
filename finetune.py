@@ -14,7 +14,7 @@ from sklearn.metrics import roc_auc_score, log_loss, accuracy_score
 
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import (
-    prepare_model_for_int8_training,
+    prepare_model_for_kbit_training,
     LoraConfig,
     get_peft_model,
     get_peft_model_state_dict,
@@ -51,11 +51,12 @@ parser.add_argument("--emb_type", type=str, default="text", help="text/colla/mix
 
 args = parser.parse_args()
 
-assert args.train_type in ["simple", "mixed", "high"]
-assert args.temp_type in ["simple", "sequential", "high"]
+assert args.train_type in ["simple", "mixed", "high", "fusion_sem_time"]
+assert args.temp_type in ["simple", "sequential", "high", "fusion_sem_time", "fusion_2ch", "fusion_3ch"]
 assert args.dataset in ["ml-1m", "BookCrossing", "ml-25m"]
 
-data_path = f"./data/{args.dataset}/proc_data/data"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+data_path = os.path.join(BASE_DIR, f"data/{args.dataset}/proc_data/data")
 
 # Fit for single card V100, increasing bs if GPU allows is OK.
 if args.K <= 15:
@@ -93,7 +94,7 @@ LORA_DROPOUT = 0.05
 VAL_SET_SIZE = args.val_size #2000
 USE_8bit = True
 model_name = args.model_path.split("/")[-1]
-OUTPUT_DIR = f"{args.output_path}/{model_name}_{args.train_type}_{args.emb_type}_new"
+OUTPUT_DIR = os.path.join(BASE_DIR, f"{args.output_path}/{model_name}_{args.train_type}_{args.emb_type}_new")
 
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
@@ -139,7 +140,7 @@ tokenizer = AutoTokenizer.from_pretrained(
 tokenizer.pad_token_id = 0
 
 if USE_8bit is True:
-    model = prepare_model_for_int8_training(model)
+    model = prepare_model_for_kbit_training(model)
 
 if args.use_lora:
     config = LoraConfig(

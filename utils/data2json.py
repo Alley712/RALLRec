@@ -1,9 +1,9 @@
 import json, os
 import sys
 from prompts.load_prompt_ml1m import zero_shot_get_prompt, zero_shot_ret_get_prompt, hybrid_ret_get_prompt
-from prompts.load_prompt_BookCrossing import book_zero_shot_get_prompt, book_zero_shot_ret_get_prompt, book_hybrid_ret_get_prompt
-from prompts.load_prompt_ml25m import ml_25m_zero_shot_get_prompt, ml_25m_zero_shot_ret_get_prompt
-from prompts.load_prompt_amazon import amazon_zero_shot_get_prompt, amazon_zero_shot_ret_get_prompt, amazon_hybrid_ret_get_prompt
+# from prompts.load_prompt_BookCrossing import book_zero_shot_get_prompt, book_zero_shot_ret_get_prompt, book_hybrid_ret_get_prompt
+# from prompts.load_prompt_ml25m import ml_25m_zero_shot_get_prompt, ml_25m_zero_shot_ret_get_prompt
+# from prompts.load_prompt_amazon import amazon_zero_shot_get_prompt, amazon_zero_shot_ret_get_prompt, amazon_hybrid_ret_get_prompt
 import argparse
 import pandas as pd
 
@@ -21,7 +21,7 @@ print(args)
 
 DATA_DIR = f"../data/{args.dataset}/proc_data"
 
-assert args.temp_type in ["simple", "sequential", "high", "low", "rerank"]
+assert args.temp_type in ["simple", "sequential", "high", "low", "rerank", "fusion_3ch", "fusion_2ch", "fusion_sem_time"]
 assert args.set in ["train", "test"]
 
 fp = os.path.join(DATA_DIR, "data")
@@ -64,7 +64,7 @@ if args.temp_type in ["simple"]: # w/o ret
                 data_dir=DATA_DIR
         )
 
-elif args.temp_type in ["sequential", "high", "low", "rerank"]: # w/ ret
+elif args.temp_type in ["sequential", "high", "low", "rerank", "fusion_3ch", "fusion_2ch", "fusion_sem_time"]: # w/ ret
     if args.dataset == "ml-25m":
         msg_iter = ml_25m_zero_shot_ret_get_prompt(
                 K=args.K,

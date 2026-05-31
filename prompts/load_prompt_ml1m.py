@@ -126,7 +126,9 @@ f"""
 
 }        
 
-    assert temp_type in template.keys(), "Template type error."
+    assert temp_type in template.keys() or temp_type in ["fusion_3ch", "fusion_2ch", "fusion_sem_time"], "Template type error."
+    if temp_type in ["fusion_3ch", "fusion_2ch", "fusion_sem_time"]:
+        return template["high"]
     # if sim_user and input_dict['sim_user_history'] is not None:
 
     #     template["sim_user"] =\
@@ -184,6 +186,9 @@ def zero_shot_ret_get_prompt(
     user_list = df["User ID"].values
     user_indice_path = os.path.join(indice_dir, '_'.join(["ml-1m", "user", "indice"])+".npy")
     user_indice = np.load(user_indice_path)
+    colla_indice = None
+    if temp_type in ["fusion_3ch", "fusion_2ch"]:
+        colla_indice = np.load(os.path.join(indice_dir, "ml-1m_colla_indice.npy"))
 
     # fill the template
     for row_number in tqdm(list(df.index)):
@@ -199,22 +204,78 @@ def zero_shot_ret_get_prompt(
         cnt = 0
         orig_hist_len = len(input_dict["history ID"])
         hist_rating_dict = {hist: rating  for hist, rating in zip(input_dict["history ID"], input_dict["history rating"])}
-        if temp_type in ["sequential", "rerank"]:
-            hist_seq_dict = {hist: i for i, hist in enumerate(input_dict["history ID"])}
-            seq_hist_dict = {i: hist for i, hist in enumerate(input_dict["history ID"])}
-            
-        input_dict["history ID"], input_dict["history rating"] = [], []
-        item_sim_thres = 0
-        for index in cur_indice:
-            # index = str(index)
-            if index in hist_rating_dict:
-                cnt += 1
-                input_dict["history ID"].append(index)
-                input_dict["history rating"].append(hist_rating_dict[index])
-                if cnt == 1:
-                    item_sim_thres = np.argmax(cur_indice == index)
-                if cnt == K:
+        if temp_type == "fusion_3ch":
+            K3 = K // 3
+            target_idx = cur_id - 1
+            sem_items = []
+            for j in range(0, len(sorted_indice[target_idx])):
+                idx = int(sorted_indice[target_idx][j])
+                if idx in hist_rating_dict:
+                    sem_items.append(idx)
+                if len(sem_items) >= K3:
                     break
+            coll_items = []
+            for j in range(0, len(colla_indice[target_idx])):
+                idx = int(colla_indice[target_idx][j])
+                if idx in hist_rating_dict and idx not in sem_items:
+                    coll_items.append(idx)
+                if len(coll_items) >= K3:
+                    break
+            time_items = list(input_dict["history ID"])[-K3:]
+            merged = list(dict.fromkeys(sem_items + coll_items + time_items))
+            input_dict["history ID"] = merged[:K]
+            input_dict["history rating"] = [hist_rating_dict.get(i, 3) for i in merged[:K]]
+        elif temp_type == "fusion_2ch":
+            K2 = K // 2
+            target_idx = cur_id - 1
+            sem_items = []
+            for j in range(0, len(sorted_indice[target_idx])):
+                idx = int(sorted_indice[target_idx][j])
+                if idx in hist_rating_dict:
+                    sem_items.append(idx)
+                if len(sem_items) >= K2:
+                    break
+            coll_items = []
+            for j in range(0, len(colla_indice[target_idx])):
+                idx = int(colla_indice[target_idx][j])
+                if idx in hist_rating_dict and idx not in sem_items:
+                    coll_items.append(idx)
+                if len(coll_items) >= K2:
+                    break
+            merged = list(dict.fromkeys(sem_items + coll_items))
+            input_dict["history ID"] = merged[:K]
+            input_dict["history rating"] = [hist_rating_dict.get(i, 3) for i in merged[:K]]
+        elif temp_type == "fusion_sem_time":
+            K2 = K // 2
+            target_idx = cur_id - 1
+            sem_items = []
+            for j in range(1, len(sorted_indice[target_idx])):
+                idx = int(sorted_indice[target_idx][j])
+                if idx in hist_rating_dict:
+                    sem_items.append(idx)
+                if len(sem_items) >= K2:
+                    break
+            time_items = input_dict["history ID"][-K2:]
+            merged = list(dict.fromkeys(sem_items + list(time_items)))
+            input_dict["history ID"] = merged[:K]
+            input_dict["history rating"] = [hist_rating_dict.get(i, 3) for i in merged[:K]]
+        else:
+            if temp_type in ["sequential", "rerank"]:
+                hist_seq_dict = {hist: i for i, hist in enumerate(input_dict["history ID"])}
+                seq_hist_dict = {i: hist for i, hist in enumerate(input_dict["history ID"])}
+
+            input_dict["history ID"], input_dict["history rating"] = [], []
+            item_sim_thres = 0
+            for index in cur_indice:
+                # index = str(index)
+                if index in hist_rating_dict:
+                    cnt += 1
+                    input_dict["history ID"].append(index)
+                    input_dict["history rating"].append(hist_rating_dict[index])
+                    if cnt == 1:
+                        item_sim_thres = np.argmax(cur_indice == index)
+                    if cnt == K:
+                        break
 
         if temp_type == "sequential":
             zipped_list = sorted(zip(input_dict["history ID"], input_dict["history rating"]), key=lambda x: hist_seq_dict[x[0]])

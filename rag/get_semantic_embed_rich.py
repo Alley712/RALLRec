@@ -14,7 +14,7 @@ embeds = []
 
 def hook(module, input, output):
     global cur_embed, embeds
-    input = input[0].cpu().detach().numpy()
+    input = input[0].cpu().detach().float().numpy()
     cur_embed = input
 
 

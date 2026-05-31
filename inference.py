@@ -16,7 +16,7 @@ from transformers import EarlyStoppingCallback
 from sklearn.metrics import roc_auc_score, log_loss, accuracy_score
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import (
-    prepare_model_for_int8_training,
+    prepare_model_for_kbit_training,
     LoraConfig,
     get_peft_model,
     get_peft_model_state_dict,
@@ -52,7 +52,8 @@ parser.add_argument("--sim_user", type=bool, default=False, help="True/False")
 parser.add_argument("--train_type", type=str, default="mixed", help="simple/mixed")
 
 args = parser.parse_args()
-args.resume_from_checkpoint = f"lora_llama/Llama3.1_{args.dataset}_{args.train_type}_text_new"
+model_name = args.model_path.split("/")[-1]
+args.resume_from_checkpoint = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"lora_llama/{model_name}_{args.train_type}_{args.emb_type}_new")
 print("\n")
 print('*'*50)
 print(args)
@@ -60,7 +61,7 @@ print('*'*50)
 print("\n")
 
 assert args.dataset in ['ml-1m', 'BookCrossing','amazon-movies']
-data_path = f"data/{args.dataset}/proc_data/data"
+data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"data/{args.dataset}/proc_data/data")
 
 transformers.set_seed(args.seed)
 
@@ -105,7 +106,6 @@ device_map = "auto"
 
 model = AutoModelForCausalLM.from_pretrained(
     args.model_path,
-    load_in_8bit=USE_8bit,
     device_map=device_map,
 )
 # model.to(device)
@@ -117,7 +117,7 @@ tokenizer.pad_token_id = 0
 print("Model loaded.")
 
 if USE_8bit is True:
-    model = prepare_model_for_int8_training(model)
+    model = prepare_model_for_kbit_training(model)
 
 if args.use_lora:
     config = LoraConfig(
@@ -148,8 +148,8 @@ model.state_dict = (
     lambda self, *_, **__: get_peft_model_state_dict(self, old_state_dict())
 ).__get__(model, type(model))
 
-if torch.__version__ >= "2" and sys.platform != "win32":
-    model = torch.compile(model)
+# if torch.__version__ >= "2" and sys.platform != "win32":
+#     model = torch.compile(model)
 
 def compute_metrics(preds, golds):
     auc = roc_auc_score(golds, preds)
