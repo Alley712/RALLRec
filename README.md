@@ -74,9 +74,9 @@ pip install torch transformers peft bitsandbytes datasets accelerate \
 | `--K` | `30` | 历史交互序列长度 |
 | `--temp_type` | `high` | 模板类型（见下表） |
 | `--emb_type` | `text` | 嵌入类型：`text` / `colla` / `mix` |
-| `--train_type` | `high` | 训练数据划分 |
+| `--train_type` | `mixed` | 训练数据划分 |
 | `--train_size` | `1024` | 训练样本数 |
-| `--epochs` | `5` | 训练轮数 |
+| `--epochs` | `20` | 训练轮数 |
 | `--lr` | `5e-4` | 学习率 |
 | `--total_batch_size` | `256` | 全局批次大小 |
 | `--use_lora` | `1` | 是否使用 LoRA（0 = 全量微调） |
@@ -89,7 +89,7 @@ pip install torch transformers peft bitsandbytes datasets accelerate \
 | `--model_path` | `../Llama-3.1-8B-Instruct` | 基座 LLM 路径 |
 | `--resume_from_checkpoint` | 自动推导 | LoRA adapter 路径 |
 | `--dataset` | `ml-1m` | 数据集 |
-| `--K` | `30` | 历史交互序列长度 |
+| `--K` | `15` | 历史交互序列长度 |
 | `--temp_type` | `high` | 模板类型 |
 | `--emb_type` | `text` | 嵌入类型 |
 | `--train_type` | `mixed` | 训练数据划分 |
