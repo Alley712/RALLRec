@@ -70,17 +70,19 @@ pip install torch transformers peft bitsandbytes datasets accelerate \
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `--model_path` | `../Llama-3.1-8B-Instruct` | 基座 LLM 路径 |
-| `--dataset` | `ml-1m` | 数据集：`ml-1m` / `BookCrossing` / `ml-25m` |
+| `--dataset` | `ml-1m` | 数据集：`ml-1m` / `BookCrossing` / `ml-25m` / `amazon-movies` |
 | `--K` | `30` | 历史交互序列长度 |
 | `--temp_type` | `high` | 模板类型（见下表） |
 | `--emb_type` | `text` | 嵌入类型：`text` / `colla` / `mix` |
-| `--train_type` | `mixed` | 训练数据划分 |
-| `--train_size` | `1024` | 训练样本数 |
-| `--epochs` | `20` | 训练轮数 |
+| `--train_type` | `high` | 训练数据划分：`simple` / `mixed` / `high` / `fusion_2ch` / `fusion_3ch` |
+| `--train_size` | `2048` | 训练样本数（`mixed` 模式下实际翻倍） |
+| `--epochs` | `7` | 训练轮数（论文原设 20，实验用 7） |
 | `--lr` | `5e-4` | 学习率 |
 | `--total_batch_size` | `256` | 全局批次大小 |
 | `--use_lora` | `1` | 是否使用 LoRA（0 = 全量微调） |
 | `--output_path` | `lora_llama` | LoRA 权重输出目录 |
+
+> **实验配置说明**：基线 A 使用 `train_size=1024, train_type=mixed, epochs=7`；基线 B 及所有改进变体使用 `train_size=2048, train_type=high, epochs=7`（56 步梯度更新）。LoRA rank=8, alpha=16, dropout=0.05，target_modules=[q_proj, v_proj]。
 
 ### 推理 (`inference.py`)
 
@@ -89,22 +91,26 @@ pip install torch transformers peft bitsandbytes datasets accelerate \
 | `--model_path` | `../Llama-3.1-8B-Instruct` | 基座 LLM 路径 |
 | `--resume_from_checkpoint` | 自动推导 | LoRA adapter 路径 |
 | `--dataset` | `ml-1m` | 数据集 |
-| `--K` | `15` | 历史交互序列长度 |
-| `--temp_type` | `high` | 模板类型 |
+| `--K` | `30` | 历史交互序列长度 |
+| `--temp_type` | `fusion_3ch` | 模板类型（需与训练时 `train_type` 对应） |
 | `--emb_type` | `text` | 嵌入类型 |
-| `--train_type` | `mixed` | 训练数据划分 |
+| `--train_type` | `high` | 训练数据划分 |
 | `--sim_user` | `False` | 是否加入相似用户检索 |
 
 ## 模板类型 (`--temp_type`)
 
-| 类型 | 说明 |
-|------|------|
-| `simple` | 历史物品按时间顺序排列，无检索 |
-| `sequential` | 历史物品含检索信息，保持原始顺序 |
-| `high` | 历史物品按与目标物品相似度降序排列 |
-| `fusion_sem_time` | 三通道：语义 + 时间 + 协同 |
-| `fusion_2ch` | 双通道：语义 + 协同 |
-| `fusion_3ch` | 三通道：语义 + 协同 + 时间 |
+| 类型 | 检索方式 | 排序策略 | 归属 |
+|------|---------|----------|------|
+| `simple` | 无检索 | 原始时间顺序，取最后 K 条 | 原始版 |
+| `low` | 无检索 | 反转时间顺序 | 原始版 |
+| `sequential` | 语义检索 | 检索 Top-K 后恢复原始时间顺序 | 原始版 |
+| `high` | 语义检索 | 按与目标物品相似度降序排列 | 原始版 |
+| `rerank` | 语义检索 | 语义检索 → 时间重排（2K/3 最近） + 尾部补全（K/3） | 原始版 |
+| `fusion_sem_time` | 语义 + 时间 | K/2 语义 + K/2 时间尾，去重拼接 | **改进版** |
+| `fusion_2ch` | 语义 + 协同 | K/2 语义 + K/2 协同，去重拼接 | **改进版** |
+| `fusion_3ch` | 语义 + 协同 + 时间 | 三路各 K/3，语义→协同→时间 去重拼接 | **改进版** |
+
+> **消融实验结论**：`fusion_3ch` AUC 0.7727（+0.0151 vs 纯语义 baseline），协同和时间单独贡献微弱但叠加产生协同效应。
 
 ## 使用流程
 
@@ -130,26 +136,28 @@ python train_lightgcn.py --dataset ml-1m
 ### 3. 构建训练数据
 
 ```bash
-# 转为训练 JSON 格式
-python utils/data2json.py --dataset ml-1m --K 30 --temp_type fusion_2ch --emb_type text
+# 转为训练 JSON 格式（以 fusion_3ch 为例）
+python utils/data2json.py --dataset ml-1m --K 30 --temp_type fusion_3ch --emb_type text --set train
+python utils/data2json.py --dataset ml-1m --K 30 --temp_type fusion_3ch --emb_type text --set test
 ```
 
 ### 4. 微调
 
 ```bash
-# 采样训练数据（可选，用于快速实验）
+# 采样训练数据
 cd data/ml-1m/proc_data/data/train
 python -c "
 import json, random
 random.seed(42)
-data = json.load(open('train_30_fusion_2ch_text.json'))
+data = json.load(open('train_30_fusion_3ch_text.json'))
 sample = random.sample(data, min(2048, len(data)))
-json.dump(sample, open('train_30_high_text_sampled.json', 'w'))
+json.dump(sample, open('train_30_fusion_3ch_text_sampled.json', 'w'))
+print(f'Sampled {len(sample)} from {len(data)}')
 "
 
 # 复制测试数据
 cd ../test
-cp test_30_fusion_2ch_text.json test_30_high_text.json
+cp test_30_fusion_3ch_text.json test_30_fusion_3ch_text_sampled.json
 
 # 开始微调
 cd /path/to/RALLRec
@@ -159,7 +167,7 @@ python finetune.py \
     --train_type high \
     --emb_type text \
     --K 30 \
-    --temp_type fusion_2ch \
+    --temp_type fusion_3ch \
     --train_size 2048 \
     --epochs 7 \
     --lr 5e-4
@@ -172,7 +180,7 @@ python inference.py \
     --model_path /path/to/Llama-3.1-8B-Instruct \
     --dataset ml-1m \
     --K 30 \
-    --temp_type fusion_2ch \
+    --temp_type fusion_3ch \
     --emb_type text \
     --train_type high
 ```
