@@ -68,7 +68,9 @@ f"You should ONLY tell me yes or no.",
 
 }        
 
-    assert temp_type in template.keys(), "Template type error."
+    assert temp_type in template.keys() or temp_type in ["fusion_3ch", "fusion_2ch", "fusion_sem_time"], "Template type error."
+    if temp_type in ["fusion_3ch", "fusion_2ch", "fusion_sem_time"]:
+        return template["high"]
     # if sim_user and input_dict['sim_user_history'] is not None:
 
     #     template["sim_user"] =\
@@ -125,6 +127,10 @@ def amazon_zero_shot_ret_get_prompt(
     indice_path = os.path.join(indice_dir, '_'.join(["amazon-movies", emb_type, "indice"])+".npy")
     sorted_indice = np.load(indice_path)
 
+    colla_indice = None
+    if temp_type in ["fusion_3ch", "fusion_2ch"]:
+        colla_indice = np.load(os.path.join(indice_dir, "amazon-movies_colla_indice.npy"))
+
     user_list = df["User ID"].values
     user_indice_path = os.path.join(indice_dir, '_'.join(["amazon-movies", "user", "indice"])+".npy")
     user_indice = np.load(user_indice_path)
@@ -147,18 +153,86 @@ def amazon_zero_shot_ret_get_prompt(
             hist_seq_dict = {hist: i for i, hist in enumerate(input_dict["history ID"])}
             seq_hist_dict = {i: hist for i, hist in enumerate(input_dict["history ID"])}
             
-        input_dict["history ID"], input_dict["history rating"] = [], []
         item_sim_thres = 0
-        for idx in cur_indice:
-            id = str(id_to_movie[str(idx)][0])
-            if id in hist_rating_dict:
-                cnt += 1
-                input_dict["history ID"].append(id)
-                input_dict["history rating"].append(hist_rating_dict[id])
-                if cnt == 1:
-                    item_sim_thres = np.argmax(cur_indice == idx)
-                if cnt == K:
+
+        if temp_type == "fusion_3ch":
+            K3 = K // 3
+            cur_id_idx = id_to_idx[input_dict["Movie ID"]]
+            # 1. semantic channel
+            sem_items = []
+            for j in range(len(sorted_indice[cur_id_idx])):
+                idx_val = sorted_indice[cur_id_idx][j]
+                candidate_id = str(id_to_movie[str(idx_val)][0])
+                if candidate_id in hist_rating_dict:
+                    sem_items.append(candidate_id)
+                if len(sem_items) >= K3:
                     break
+            # 2. collaborative channel
+            coll_items = []
+            for j in range(len(colla_indice[cur_id_idx])):
+                idx_val = colla_indice[cur_id_idx][j]
+                candidate_id = str(id_to_movie[str(idx_val)][0])
+                if candidate_id in hist_rating_dict and candidate_id not in sem_items:
+                    coll_items.append(candidate_id)
+                if len(coll_items) >= K3:
+                    break
+            # 3. temporal channel
+            time_items = list(input_dict["history ID"])[-K3:]
+            merged = list(dict.fromkeys(sem_items + coll_items + time_items))
+            input_dict["history ID"] = merged[:K]
+            input_dict["history rating"] = [hist_rating_dict.get(i, 3) for i in merged[:K]]
+
+        elif temp_type == "fusion_2ch":
+            K2 = K // 2
+            cur_id_idx = id_to_idx[input_dict["Movie ID"]]
+            sem_items = []
+            for j in range(len(sorted_indice[cur_id_idx])):
+                idx_val = sorted_indice[cur_id_idx][j]
+                candidate_id = str(id_to_movie[str(idx_val)][0])
+                if candidate_id in hist_rating_dict:
+                    sem_items.append(candidate_id)
+                if len(sem_items) >= K2:
+                    break
+            coll_items = []
+            for j in range(len(colla_indice[cur_id_idx])):
+                idx_val = colla_indice[cur_id_idx][j]
+                candidate_id = str(id_to_movie[str(idx_val)][0])
+                if candidate_id in hist_rating_dict and candidate_id not in sem_items:
+                    coll_items.append(candidate_id)
+                if len(coll_items) >= K2:
+                    break
+            merged = list(dict.fromkeys(sem_items + coll_items))
+            input_dict["history ID"] = merged[:K]
+            input_dict["history rating"] = [hist_rating_dict.get(i, 3) for i in merged[:K]]
+
+        elif temp_type == "fusion_sem_time":
+            K2 = K // 2
+            cur_id_idx = id_to_idx[input_dict["Movie ID"]]
+            sem_items = []
+            for j in range(1, len(sorted_indice[cur_id_idx])):
+                idx_val = sorted_indice[cur_id_idx][j]
+                candidate_id = str(id_to_movie[str(idx_val)][0])
+                if candidate_id in hist_rating_dict:
+                    sem_items.append(candidate_id)
+                if len(sem_items) >= K2:
+                    break
+            time_items = input_dict["history ID"][-K2:]
+            merged = list(dict.fromkeys(sem_items + list(time_items)))
+            input_dict["history ID"] = merged[:K]
+            input_dict["history rating"] = [hist_rating_dict.get(i, 3) for i in merged[:K]]
+
+        else:
+            input_dict["history ID"], input_dict["history rating"] = [], []
+            for idx in cur_indice:
+                id = str(id_to_movie[str(idx)][0])
+                if id in hist_rating_dict:
+                    cnt += 1
+                    input_dict["history ID"].append(id)
+                    input_dict["history rating"].append(hist_rating_dict[id])
+                    if cnt == 1:
+                        item_sim_thres = np.argmax(cur_indice == idx)
+                    if cnt == K:
+                        break
 
         assert len(input_dict["history ID"]) > 0, "error, no history"
 

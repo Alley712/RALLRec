@@ -51,9 +51,9 @@ parser.add_argument("--emb_type", type=str, default="text", help="text/colla/mix
 
 args = parser.parse_args()
 
-assert args.train_type in ["simple", "mixed", "high", "fusion_sem_time"]
+assert args.train_type in ["simple", "mixed", "high", "fusion_sem_time", "fusion_2ch", "fusion_3ch"]
 assert args.temp_type in ["simple", "sequential", "high", "fusion_sem_time", "fusion_2ch", "fusion_3ch"]
-assert args.dataset in ["ml-1m", "BookCrossing", "ml-25m"]
+assert args.dataset in ["ml-1m", "BookCrossing", "ml-25m", "amazon-movies"]
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 data_path = os.path.join(BASE_DIR, f"data/{args.dataset}/proc_data/data")

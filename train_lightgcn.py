@@ -2,8 +2,8 @@
 训练 LightGCN 获取协同 embedding (e_colla)。
 优化版：稀疏矩阵做图卷积，向量化 BPR loss，200 epoch 约 30 分钟。
 
-输入：RALLRec/data/ml-1m/proc_data/train.txt
-输出：data/ml-1m/saved_embed/lightgcn_{user,item}_emb.npy + lightgcn_id2item.json
+输入：RALLRec/data/{dataset}/proc_data/train.txt
+输出：data/{dataset}/saved_embed/lightgcn_{user,item}_emb.npy + lightgcn_id2item.json
 """
 
 import numpy as np
@@ -12,10 +12,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 from scipy.sparse import coo_matrix, eye
 import json, os, random, time
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--dataset", type=str, default="ml-1m")
+args = parser.parse_args()
+
+base = f"/root/autodl-tmp/RALLRec/data/{args.dataset}"
+save_dir = f"{base}/saved_embed"
+os.makedirs(save_dir, exist_ok=True)
 
 # ===== 1. 加载数据 =====
 users, items = [], []
-with open('/root/autodl-tmp/RALLRec/data/ml-1m/proc_data/train.txt') as f:
+with open(f'{base}/proc_data/train.txt') as f:
     for line in f:
         u, i, _ = line.strip().split()
         users.append(int(u) - 1)
@@ -125,14 +134,16 @@ for epoch in range(200):
     print(f"Epoch {epoch:3d} | loss={epoch_loss / batches_per_epoch:.4f} | {elapsed:.1f}s/epoch")
 
 # ===== 5. 保存 =====
-save_dir = '/root/autodl-tmp/RALLRec/data/ml-1m/saved_embed'
-os.makedirs(save_dir, exist_ok=True)
-
 u_emb, i_emb = model()
 np.save(os.path.join(save_dir, 'lightgcn_user_emb.npy'), u_emb.cpu().detach().numpy())
 np.save(os.path.join(save_dir, 'lightgcn_item_emb.npy'), i_emb.cpu().detach().numpy())
 
-id2item = {str(i): str(i + 1) for i in range(num_items)}
+if args.dataset == "amazon-movies":
+    # Amazon: 从 id2idx.json 反向构造 id2item
+    id2idx = json.load(open(f'{base}/proc_data/id2idx.json'))
+    id2item = {str(idx): asin for asin, idx in id2idx.items()}
+else:
+    id2item = {str(i): str(i + 1) for i in range(num_items)}
 json.dump(id2item, open(os.path.join(save_dir, 'lightgcn_id2item.json'), 'w'))
 print(f"\nDone. Saved to {save_dir}/")
 print(f"  user_emb:  {u_emb.shape}")

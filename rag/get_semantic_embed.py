@@ -51,7 +51,7 @@ def simple_iter(args):
 
     elif args.dataset == "amazon-movies":
         movie_dict = json.load(open(os.path.join(args.data_dir, "idx2movie.json"), "r"))
-        for i in trange(1):
+        for i in trange(len(movie_dict)):
             key = str(i)
             if key not in movie_dict.keys():
                 title, genre = "", ""

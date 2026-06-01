@@ -3,7 +3,7 @@ import sys
 from prompts.load_prompt_ml1m import zero_shot_get_prompt, zero_shot_ret_get_prompt, hybrid_ret_get_prompt
 # from prompts.load_prompt_BookCrossing import book_zero_shot_get_prompt, book_zero_shot_ret_get_prompt, book_hybrid_ret_get_prompt
 # from prompts.load_prompt_ml25m import ml_25m_zero_shot_get_prompt, ml_25m_zero_shot_ret_get_prompt
-# from prompts.load_prompt_amazon import amazon_zero_shot_get_prompt, amazon_zero_shot_ret_get_prompt, amazon_hybrid_ret_get_prompt
+from prompts.load_prompt_amazon import amazon_zero_shot_get_prompt, amazon_zero_shot_ret_get_prompt, amazon_hybrid_ret_get_prompt
 import argparse
 import pandas as pd
 
