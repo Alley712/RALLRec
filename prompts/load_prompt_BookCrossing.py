@@ -70,7 +70,9 @@ f"And we think the user will like a new book if the rating could be higher than 
 f"You should ONLY tell me yes or no.",
 }
 
-    assert temp_type in template.keys(), "Template type error."
+    assert temp_type in template.keys() or temp_type in ["fusion_3ch", "fusion_2ch", "fusion_sem_time"], "Template type error."
+    if temp_type in ["fusion_3ch", "fusion_2ch", "fusion_sem_time"]:
+        return template["high"]
     return template[temp_type]
 
 
@@ -109,6 +111,10 @@ def book_zero_shot_ret_get_prompt(
     indice_dir = f"../embeddings/BookCroosing_{emb_type}_indice_{istrain}.json"
     sorted_indice = json.load(open(indice_dir))
 
+    colla_indice = None
+    if temp_type in ["fusion_3ch", "fusion_2ch"]:
+        colla_indice = json.load(open(f"../embeddings/BookCroosing_colla_indice_{istrain}.json"))
+
     id2book = json.load(open(os.path.join(data_dir, "id2book.json"), "r"))
     isbn2id = json.load(open(os.path.join(data_dir, "isbn2id.json"), "r"))
     isbn2title = {isbn: id2book[str(isbn2id[isbn])][1] for isbn in isbn2id.keys()}
@@ -131,11 +137,57 @@ def book_zero_shot_ret_get_prompt(
             hist_seq_dict = {hist: i for i, hist in enumerate(input_dict["user_hist"])}
             seq_hist_dict = {i: hist for i, hist in enumerate(input_dict["user_hist"])}
             
-        input_dict["user_hist"], input_dict["hist_rating"] = [], []
-        
-        for i in range(min(K, len(cur_indice))):
-           input_dict['user_hist'].append(cur_indice[i])
-           input_dict['hist_rating'].append(hist_rating_dict[cur_indice[i]])
+        if temp_type == "fusion_3ch":
+            K3 = K // 3
+            sem_items = []
+            for i in range(min(K3, len(cur_indice))):
+                sem_items.append(cur_indice[i])
+            coll_items = []
+            cur_colla = colla_indice[row_number]
+            for i in range(min(K3*2, len(cur_colla))):
+                candidate = cur_colla[i]
+                if candidate in hist_rating_dict and candidate not in sem_items:
+                    coll_items.append(candidate)
+                if len(coll_items) >= K3:
+                    break
+            time_items = list(input_dict["user_hist"])[-K3:]
+            merged = list(dict.fromkeys(sem_items + coll_items + time_items))
+            input_dict["user_hist"] = merged[:K]
+            input_dict["hist_rating"] = [hist_rating_dict.get(i, hist_rating_dict.get(list(hist_rating_dict.keys())[-1], 3)) for i in merged[:K]]
+
+        elif temp_type == "fusion_2ch":
+            K2 = K // 2
+            sem_items = []
+            for i in range(min(K2, len(cur_indice))):
+                sem_items.append(cur_indice[i])
+            coll_items = []
+            cur_colla = colla_indice[row_number]
+            for i in range(min(K2*2, len(cur_colla))):
+                candidate = cur_colla[i]
+                if candidate in hist_rating_dict and candidate not in sem_items:
+                    coll_items.append(candidate)
+                if len(coll_items) >= K2:
+                    break
+            merged = list(dict.fromkeys(sem_items + coll_items))
+            input_dict["user_hist"] = merged[:K]
+            input_dict["hist_rating"] = [hist_rating_dict.get(i, 3) for i in merged[:K]]
+
+        elif temp_type == "fusion_sem_time":
+            K2 = K // 2
+            sem_items = []
+            for i in range(1, min(K2+1, len(cur_indice))):
+                sem_items.append(cur_indice[i])
+            time_items = input_dict["user_hist"][-K2:]
+            merged = list(dict.fromkeys(sem_items + list(time_items)))
+            input_dict["user_hist"] = merged[:K]
+            input_dict["hist_rating"] = [hist_rating_dict.get(i, 3) for i in merged[:K]]
+
+        else:
+            input_dict["user_hist"], input_dict["hist_rating"] = [], []
+
+            for i in range(min(K, len(cur_indice))):
+               input_dict['user_hist'].append(cur_indice[i])
+               input_dict['hist_rating'].append(hist_rating_dict[cur_indice[i]])
 
         if temp_type == "sequential":
             zipped_list = sorted(zip(input_dict["user_hist"], input_dict["hist_rating"]), key=lambda x: hist_seq_dict[x[0]])

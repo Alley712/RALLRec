@@ -142,6 +142,10 @@ if args.dataset == "amazon-movies":
     # Amazon: 从 id2idx.json 反向构造 id2item
     id2idx = json.load(open(f'{base}/proc_data/id2idx.json'))
     id2item = {str(idx): asin for asin, idx in id2idx.items()}
+elif args.dataset == "BookCrossing":
+    # BookCrossing: 从 isbn2id.json 反向构造 id2item (0-indexed LightGCN ID -> ISBN)
+    isbn2id = json.load(open(f'{base}/proc_data/isbn2id.json'))
+    id2item = {str(idx): isbn for isbn, idx in isbn2id.items()}
 else:
     id2item = {str(i): str(i + 1) for i in range(num_items)}
 json.dump(id2item, open(os.path.join(save_dir, 'lightgcn_id2item.json'), 'w'))
