@@ -82,7 +82,7 @@ pip install torch transformers peft bitsandbytes datasets accelerate \
 | `--use_lora` | `1` | 是否使用 LoRA（0 = 全量微调） |
 | `--output_path` | `lora_llama` | LoRA 权重输出目录 |
 
-> **实验配置说明**：基线 A 使用 `train_size=1024, train_type=mixed, epochs=7`；基线 B 及所有改进变体使用 `train_size=2048, train_type=high, epochs=7`（56 步梯度更新）。LoRA rank=8, alpha=16, dropout=0.05，target_modules=[q_proj, v_proj]。
+> **实验配置说明**：推荐配置为 `train_size=2048, train_type=high, epochs=7`。LoRA rank=8, alpha=16, dropout=0.05, target_modules=[q_proj, v_proj]，支持 8-bit 量化（`BitsAndBytesConfig(load_in_8bit=True)`）。
 
 ### 推理 (`inference.py`)
 
@@ -110,7 +110,6 @@ pip install torch transformers peft bitsandbytes datasets accelerate \
 | `fusion_2ch` | 语义 + 协同 | K/2 语义 + K/2 协同，去重拼接 | **改进版** |
 | `fusion_3ch` | 语义 + 协同 + 时间 | 三路各 K/3，语义→协同→时间 去重拼接 | **改进版** |
 
-> **消融实验结论**：`fusion_3ch` AUC 0.7727（+0.0151 vs 纯语义 baseline），协同和时间单独贡献微弱但叠加产生协同效应。
 
 ## 使用流程
 
