@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
-# from vllm import LLM, SamplingParams  # unused, vllm requires CUDA 13 runtime
+# from vllm import LLM, SamplingParams  # vLLM not available on this system; using HF Transformers instead
 
 cur_embed = None
 embeds = []
@@ -108,7 +108,7 @@ def main(args):
 
         cur_embed = None
 
-        output_ids = model.generate(**inputs, do_sample=True, max_new_tokens=2)
+        _ = model(**inputs)  # forward pass only — hook captures hidden states; no generation needed
         
         if args.pooling == "last":
             cur_embed = cur_embed[0, len(input_ids[0])-1]
