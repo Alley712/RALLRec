@@ -41,12 +41,9 @@ def simple_iter(args):
             yield text
     
     elif args.dataset == "BookCrossing":
-        id2book = json.load(open(os.path.join(args.data_dir, "id2book.json"), "r"))
-        for i in trange(len(id2book)):
-            isbn, title, author, year, publisher = id2book[str(i)]
-            text = \
-                f"Here is a book. Its title is {title}. ISBN of the book is {isbn}. The author of the book is {author}. "\
-                f"The publication year of the book is {year}. Its publisher is {publisher}."
+        id2text = json.load(open(os.path.join(args.data_dir, "BookCrossing_text.json"), "r"))
+        for i in trange(len(id2text)):
+            text = id2text[str(i)]
             yield text
 
     elif args.dataset == "amazon-movies":
