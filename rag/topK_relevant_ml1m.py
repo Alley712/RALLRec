@@ -26,7 +26,8 @@ def item_sim(args):
     if args.embed_type not in ["txt", "text"]:
         colla_emb = np.load(fp2)
         _, colla_dim = colla_emb.shape
-        embed2 = np.zeros((n_item, colla_dim))
+        max_item_id = max(int(v) for v in colla_id2item.values())
+        embed2 = np.zeros((max_item_id, colla_dim))
         for emb_id, item_id in colla_id2item.items():
             embed2[int(item_id)-1] = colla_emb[int(emb_id)]
         print(f"dim of colla emb: {colla_dim}")
@@ -96,7 +97,8 @@ def item_sim_ssl(args):
     if args.embed_type != "text":
         colla_emb = np.load(fp2)
         _, colla_dim = colla_emb.shape
-        embed2 = np.zeros((n_item, colla_dim))
+        max_item_id = max(int(v) for v in colla_id2item.values())
+        embed2 = np.zeros((max_item_id, colla_dim))
         for emb_id, item_id in colla_id2item.items():
             embed2[int(item_id)-1] = colla_emb[int(emb_id)]
         print(f"dim of colla emb: {colla_dim}")
