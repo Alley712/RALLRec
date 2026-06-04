@@ -55,7 +55,7 @@ def simple_iter(args):
             else:
                 movie_id, title, genre = movie_dict[key]
             text = \
-                f"Here is a movie. Its title is {title}. The movie's genre is {genre}." 
+                f"Here is a movie. Its title is {title}. The movie's genre is {genre}."
             yield text
         
     else:
@@ -144,7 +144,7 @@ def main(args):
 
         cur_embed = None
 
-        output_ids = model.generate(**inputs, do_sample=True, max_new_tokens=256)
+        _ = model(**inputs)  # forward pass only — hook captures hidden states; no generation needed
         
         if args.pooling == "last":
             cur_embed = cur_embed[0, len(input_ids[0])-1]
